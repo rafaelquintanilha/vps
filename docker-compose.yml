@@ -1,0 +1,64 @@
+services:
+  caddy:
+    image: caddy:2
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - web
+
+  n8n:
+    image: n8nio/n8n:latest
+    restart: always
+    environment:
+      - TZ=${TIMEZONE}
+      - GENERIC_TIMEZONE=${TIMEZONE}
+      - N8N_BASIC_AUTH_ACTIVE=${N8N_BASIC_AUTH_ACTIVE}
+      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD}
+      - WEBHOOK_URL=${N8N_WEBHOOK_URL}
+      - N8N_EDITOR_BASE_URL=${N8N_EDITOR_BASE_URL}
+      - N8N_PROTOCOL=${N8N_PROTOCOL}
+      - N8N_HOST=${N8N_HOST}
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks:
+      - web
+
+  mmatrends-cron:
+    build:
+      context: ./apps/mmatrends
+      dockerfile: Dockerfile.cron
+    environment:
+      - TZ=${TIMEZONE}
+    volumes:
+      - ./apps/mmatrends/logs:/var/log
+    restart: always
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    command: redis-server --requirepass ${REDIS_PASSWORD} --appendonly yes
+    ports:
+      - "${REDIS_EXTERNAL_PORT}:6379"
+    volumes:
+      - redis_data:/data
+    environment:
+      - TZ=${TIMEZONE}
+    networks:
+      - web
+
+volumes:
+  caddy_data:
+  caddy_config:
+  n8n_data:
+  redis_data:
+
+networks:
+  web:
+    driver: bridge

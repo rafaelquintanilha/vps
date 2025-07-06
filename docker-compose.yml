@@ -13,7 +13,9 @@ services:
       - web
 
   n8n:
-    image: n8nio/n8n:latest
+    build:
+      context: ./n8n-playwright
+      dockerfile: Dockerfile
     restart: always
     environment:
       - TZ=${TIMEZONE}
@@ -25,6 +27,22 @@ services:
       - N8N_EDITOR_BASE_URL=${N8N_EDITOR_BASE_URL}
       - N8N_PROTOCOL=${N8N_PROTOCOL}
       - N8N_HOST=${N8N_HOST}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      
+      # Playwright & Node modules
+      - NODE_FUNCTION_ALLOW_EXTERNAL=puppeteer-core,playwright-core
+      - NODE_FUNCTION_ALLOW_BUILTIN=*
+      - NODE_PATH=/home/node/node_modules:/usr/local/lib/node_modules
+      
+      # Chrome/Chromium environment
+      - CHROME_BIN=/usr/bin/chromium-browser
+      - PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+      - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+      - PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+      - PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser
+
     volumes:
       - n8n_data:/home/node/.n8n
     networks:

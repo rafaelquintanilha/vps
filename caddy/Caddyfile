@@ -1,3 +1,7 @@
 n8n.quantbrasil.com.br {
   reverse_proxy n8n:5678
 }
+
+metabase.quantbrasil.com.br {
+  reverse_proxy metabase:3000
+}

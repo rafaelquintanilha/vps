@@ -58,6 +58,32 @@ services:
       - ./apps/mmatrends/logs:/var/log
     restart: always
 
+  metabase:
+    image: metabase/metabase:latest
+    restart: always
+    ports:
+      - "${METABASE_PORT:-3000}:3000"
+    environment:
+      - MB_DB_TYPE=postgres
+      - MB_DB_DBNAME=${METABASE_DB_NAME}
+      - MB_DB_PORT=5432
+      - MB_DB_USER=${METABASE_DB_USER}
+      - MB_DB_PASS=${METABASE_DB_PASS}
+      - MB_DB_HOST=postgres
+      - JAVA_TIMEZONE=${TIMEZONE}
+      # Performance settings
+      - JAVA_TOOL_OPTIONS=-Xmx${METABASE_JAVA_HEAP:-2g}
+      # Additional settings
+      - MB_SITE_NAME=${METABASE_SITE_NAME:-Analytics}
+      - MB_SITE_URL=${METABASE_SITE_URL}
+    volumes:
+      - metabase_plugins:/plugins
+      - /dev/urandom:/dev/random:ro
+    networks:
+      - web
+    depends_on:
+      - postgres
+
   redis:
     image: redis:7-alpine
     restart: always
@@ -71,11 +97,29 @@ services:
     networks:
       - web
 
+  postgres:
+    image: postgres:16-alpine
+    restart: always
+    ports:
+      - "${POSTGRES_EXTERNAL_PORT:-5432}:5432"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DEFAULT_DB}
+      - TZ=${TIMEZONE}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d
+    networks:
+      - web
+
 volumes:
   caddy_data:
   caddy_config:
   n8n_data:
   redis_data:
+  postgres_data:
+  metabase_plugins:
 
 networks:
   web:

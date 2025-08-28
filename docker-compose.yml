@@ -58,6 +58,32 @@ services:
       - ./apps/mmatrends/logs:/var/log
     restart: always
 
+  pronto-backend:
+    build:
+      context: ./apps/pronto
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "${PRONTO_PORT:-3001}:3000"
+    environment:
+      - DATABASE_URL=${PRONTO_DATABASE_URL}
+      - PORT=3000
+      - NODE_ENV=${NODE_ENV:-production}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
+      - LINEAR_API_KEY=${LINEAR_API_KEY}
+      - LINEAR_WEBHOOK_SECRET=${LINEAR_WEBHOOK_SECRET}
+    networks:
+      - web
+    depends_on:
+      - postgres
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
   metabase:
     image: metabase/metabase:latest
     restart: always

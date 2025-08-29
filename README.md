@@ -1,6 +1,14 @@
-# VPS
+# VPS Infrastructure
 
-Currently on Hostinger (KVM 4).
+This repository contains the infrastructure configuration for the VPS hosting multiple applications.
 
-- Uses Caddy for routing.
-- Custom apps are in /apps but are not committed to this repo (they are individually set in different repos).
+## Structure
+
+- `scripts/` - Deployment and monitoring scripts
+- `runtime/` - Runtime files (gitignored)
+- `apps/` - Application deployments (gitignored)
+- `docker-compose.yml` - Main infrastructure configuration
+
+## Deployment
+
+Webhook-triggered deployment pipeline with cron monitoring.

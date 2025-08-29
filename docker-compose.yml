@@ -73,6 +73,9 @@ services:
       - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
       - LINEAR_API_KEY=${LINEAR_API_KEY}
       - LINEAR_WEBHOOK_SECRET=${LINEAR_WEBHOOK_SECRET}
+      - DEPLOYMENT_SECRET=${DEPLOYMENT_SECRET}
+    volumes:
+      - ./runtime/deploy-triggers:/deploy-triggers
     networks:
       - web
     depends_on:

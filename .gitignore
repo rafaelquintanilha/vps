@@ -1,3 +1,5 @@
 .env
 apps/*/
 !apps/README.md
+runtime/
+*.log

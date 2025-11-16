@@ -1,4 +1,5 @@
 n8n.quantbrasil.com.br {
+  header X-Robots-Tag "noindex, nofollow"
   reverse_proxy n8n:5678
 }
 
@@ -8,4 +9,8 @@ metabase.quantbrasil.com.br {
 
 pronto.rafaelquintanilha.com {
   reverse_proxy pronto-backend:3000
+}
+
+obs-chat.quantbrasil.com.br {
+  reverse_proxy obs-chat-spotlight:3030
 }

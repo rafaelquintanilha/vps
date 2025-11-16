@@ -87,6 +87,27 @@ services:
       retries: 3
       start_period: 40s
 
+  obs-chat-spotlight:
+    build:
+      context: ./apps/obs-chat-spotlight
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "${OBS_CHAT_PORT:-3030}:3030"
+    environment:
+      - YOUTUBE_API_KEY=${YOUTUBE_API_KEY}
+      - PORT=3030
+      - NODE_ENV=production
+      - TZ=${TIMEZONE}
+    networks:
+      - web
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3030/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
   metabase:
     image: metabase/metabase:latest
     restart: always

@@ -8,24 +8,29 @@ metabase.quantbrasil.com.br {
 }
 
 pronto.rafaelquintanilha.com {
-  # API requests - NO auth (pass through to backend)
-  handle /api/* {
+  # Define matchers for backend routes (no auth)
+  @api path /api/*
+  @webhooks path /webhooks/*
+  @healthz path /healthz
+  @deploy path /deploy /deploy/*
+
+  # Backend routes - NO auth
+  handle @api {
     reverse_proxy pronto-backend:3000
   }
-
-  # Webhooks - NO auth (external services need access)
-  handle /webhooks/* {
+  handle @webhooks {
     reverse_proxy pronto-backend:3000
   }
-
-  # Health check - NO auth
-  handle /healthz {
+  handle @healthz {
+    reverse_proxy pronto-backend:3000
+  }
+  handle @deploy {
     reverse_proxy pronto-backend:3000
   }
 
   # Static frontend files - WITH Basic Auth
   handle {
-    basicauth {
+    basic_auth {
       {$PRONTO_BASIC_AUTH_USER} {$PRONTO_BASIC_AUTH_HASH}
     }
     root * /srv/pronto-frontend

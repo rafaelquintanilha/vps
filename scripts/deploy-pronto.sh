@@ -72,15 +72,20 @@ git pull origin master
 NEW_COMMIT=$(git rev-parse HEAD)
 log "Updated from $CURRENT_COMMIT to $NEW_COMMIT"
 
-# Step 2: Build new Docker image
-log "Step 2: Building new Docker image..."
+# Step 2: Build frontend
+log "Step 2: Building frontend..."
+cd "$REPO_DIR"
+pnpm install --frozen-lockfile
+cd apps/client
+pnpm build
 cd "$DOCKER_COMPOSE_DIR"
 
-# Build the new image
+# Step 3: Build new Docker image
+log "Step 3: Building new Docker image..."
 docker-compose build "$SERVICE_NAME"
 
-# Step 3: Health check current container
-log "Step 3: Checking current container health..."
+# Step 4: Health check current container
+log "Step 4: Checking current container health..."
 CONTAINER_NAME=$(get_container_name)
 if [ -n "$CONTAINER_NAME" ]; then
     CURRENT_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' "$CONTAINER_NAME" 2>/dev/null || echo "unknown")
@@ -89,8 +94,8 @@ else
     log "No running container found, proceeding with deployment"
 fi
 
-# Step 4: Deploy with zero downtime
-log "Step 4: Deploying new container..."
+# Step 5: Deploy with zero downtime
+log "Step 5: Deploying new container..."
 
 # Stop and remove existing container to avoid ContainerConfig errors
 EXISTING_CONTAINER=$(get_container_name)
@@ -161,8 +166,8 @@ for i in $(seq 1 $HEALTH_CHECK_ATTEMPTS); do
     sleep $HEALTH_CHECK_DELAY
 done
 
-# Step 5: Verify deployment
-log "Step 5: Verifying deployment..."
+# Step 6: Verify deployment
+log "Step 6: Verifying deployment..."
 RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3001/healthz)
 
 if [ "$RESPONSE" = "200" ]; then
@@ -172,8 +177,8 @@ else
     exit 1
 fi
 
-# Step 6: Cleanup old images
-log "Step 6: Cleaning up old Docker images..."
+# Step 7: Cleanup old images
+log "Step 7: Cleaning up old Docker images..."
 docker image prune -f
 
 # Deployment complete

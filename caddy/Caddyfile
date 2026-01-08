@@ -8,7 +8,30 @@ metabase.quantbrasil.com.br {
 }
 
 pronto.rafaelquintanilha.com {
-  reverse_proxy pronto-backend:3000
+  # API requests - NO auth (pass through to backend)
+  handle /api/* {
+    reverse_proxy pronto-backend:3000
+  }
+
+  # Webhooks - NO auth (external services need access)
+  handle /webhooks/* {
+    reverse_proxy pronto-backend:3000
+  }
+
+  # Health check - NO auth
+  handle /healthz {
+    reverse_proxy pronto-backend:3000
+  }
+
+  # Static frontend files - WITH Basic Auth
+  handle {
+    basicauth {
+      {$PRONTO_BASIC_AUTH_USER} {$PRONTO_BASIC_AUTH_HASH}
+    }
+    root * /srv/pronto-frontend
+    try_files {path} /index.html
+    file_server
+  }
 }
 
 obs-chat.quantbrasil.com.br {

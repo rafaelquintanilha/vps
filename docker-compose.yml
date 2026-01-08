@@ -9,6 +9,10 @@ services:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile
       - caddy_data:/data
       - caddy_config:/config
+      - ./apps/pronto/apps/client/dist/public:/srv/pronto-frontend:ro
+    environment:
+      - PRONTO_BASIC_AUTH_USER=${PRONTO_BASIC_AUTH_USER}
+      - PRONTO_BASIC_AUTH_HASH=${PRONTO_BASIC_AUTH_HASH}
     networks:
       - web
 

@@ -74,8 +74,8 @@ for DB_NAME in $DATABASES; do
     BACKUP_FILE="${BACKUP_DIR}/${DB_NAME}_${TIMESTAMP}.sql.gz"
     S3_PATH="s3://${S3_BACKUP_BUCKET}/${S3_BACKUP_PREFIX}/${DATE_FOLDER}/${DB_NAME}_${TIMESTAMP}.sql.gz"
 
-    # Create backup using docker exec
-    if docker exec c39f61ea9e77_apps_postgres_1 pg_dump -U "$POSTGRES_USER" "$DB_NAME" 2>/dev/null | gzip > "$BACKUP_FILE"; then
+    # Create backup using docker compose exec
+    if docker compose -f /opt/apps/docker-compose.yml exec -T postgres pg_dump -U "$POSTGRES_USER" "$DB_NAME" 2>/dev/null | gzip > "$BACKUP_FILE"; then
         # Check if backup file has content
         if [ -s "$BACKUP_FILE" ]; then
             log "  Created: $BACKUP_FILE ($(du -h "$BACKUP_FILE" | cut -f1))"

@@ -13,6 +13,8 @@ pronto.rafaelquintanilha.com {
   @webhooks path /webhooks/*
   @healthz path /healthz
   @deploy path /deploy /deploy/*
+  @metrics path /metrics/*
+  @admin path /admin/*
 
   # Backend routes - NO auth
   handle @api {
@@ -25,6 +27,12 @@ pronto.rafaelquintanilha.com {
     reverse_proxy pronto-backend:3000
   }
   handle @deploy {
+    reverse_proxy pronto-backend:3000
+  }
+  handle @metrics {
+    reverse_proxy pronto-backend:3000
+  }
+  handle @admin {
     reverse_proxy pronto-backend:3000
   }
 

@@ -114,6 +114,22 @@ services:
       retries: 3
       start_period: 15s
 
+  realstate-cron:
+    build:
+      context: ./apps/realstate-scraper
+      dockerfile: Dockerfile.cron
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql://${REALSTATE_DB_USER}:${REALSTATE_DB_PASS}@postgres:5432/${REALSTATE_DB_NAME}
+      - FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY}
+      - TZ=${TIMEZONE}
+    volumes:
+      - ./apps/realstate-scraper/logs:/var/log
+    networks:
+      - web
+    depends_on:
+      - postgres
+
   metabase:
     image: metabase/metabase:latest
     restart: always

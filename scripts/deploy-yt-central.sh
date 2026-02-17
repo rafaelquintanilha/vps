@@ -8,7 +8,7 @@ LOG_FILE="/opt/apps/runtime/logs/yt-central-deploy.log"
 RUN_DB_PUSH="${RUN_DB_PUSH:-false}"
 
 log() {
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
+  echo "[$(date +%Y-%m-%d %H:%M:%S)] $1" | tee -a "$LOG_FILE"
 }
 
 log "========================================="
@@ -23,8 +23,16 @@ git fetch origin master
 CURRENT_COMMIT="$(git rev-parse HEAD)"
 TARGET_COMMIT="$(git rev-parse origin/master)"
 
+if ! git diff --quiet || ! git diff --cached --quiet; then
+  log "Local tracked changes detected; resetting to origin/master"
+fi
+
+# Force working tree to exact remote master commit to avoid VPS-local drift
+# breaking deploys (e.g. bun.lock mutation on server).
+git reset --hard "$TARGET_COMMIT"
+git clean -fd
+
 if [ "$CURRENT_COMMIT" != "$TARGET_COMMIT" ]; then
-  git pull --ff-only origin master
   log "Updated from $CURRENT_COMMIT to $TARGET_COMMIT"
 else
   log "Already up to date ($CURRENT_COMMIT)"
@@ -42,7 +50,7 @@ docker compose up -d --build yt-central yt-central-cron
 
 log "Verifying health endpoint..."
 for attempt in $(seq 1 30); do
-  HTTP_CODE="$(curl -sS -o /dev/null -w '%{http_code}' https://yt.rafaelquintanilha.com/healthz || true)"
+  HTTP_CODE="$(curl -sS -o /dev/null -w %{http_code} https://yt.rafaelquintanilha.com/healthz || true)"
   if [ "$HTTP_CODE" = "200" ]; then
     log "Health check passed"
     log "Deployment completed successfully"

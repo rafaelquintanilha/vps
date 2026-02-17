@@ -50,7 +50,7 @@ docker compose up -d --build yt-central yt-central-cron
 
 log "Verifying health endpoint..."
 for attempt in $(seq 1 30); do
-  HTTP_CODE="$(curl -sS -o /dev/null -w %{http_code} https://yt.rafaelquintanilha.com/healthz || true)"
+  HTTP_CODE="$(curl -sS -o /dev/null -w '%{http_code}' https://yt.rafaelquintanilha.com/healthz || true)"
   if [ "$HTTP_CODE" = "200" ]; then
     log "Health check passed"
     log "Deployment completed successfully"

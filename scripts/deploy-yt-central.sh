@@ -8,7 +8,7 @@ LOG_FILE="/opt/apps/runtime/logs/yt-central-deploy.log"
 RUN_DB_PUSH="${RUN_DB_PUSH:-false}"
 
 log() {
-  echo "[$(date +%Y-%m-%d %H:%M:%S)] $1" | tee -a "$LOG_FILE"
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
 }
 
 log "========================================="

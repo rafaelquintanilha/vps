@@ -1,0 +1,41 @@
+name: Deploy YT Central
+
+on:
+  repository_dispatch:
+    types:
+      - yt-central-deploy
+  workflow_dispatch:
+    inputs:
+      run_db_push:
+        description: "Run bun run db:push before deploy"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: yt-central-production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on:
+      - self-hosted
+      - Linux
+      - X64
+      - vps
+    timeout-minutes: 30
+    env:
+      RUN_DB_PUSH: ${{ github.event_name == 'workflow_dispatch' && inputs.run_db_push || github.event.client_payload.run_db_push || false }}
+
+    steps:
+      - name: Checkout vps repo
+        uses: actions/checkout@v4
+
+      - name: Ensure deploy script is executable
+        run: chmod +x scripts/deploy-yt-central.sh
+
+      - name: Deploy yt-central
+        run: RUN_DB_PUSH="${RUN_DB_PUSH}" scripts/deploy-yt-central.sh

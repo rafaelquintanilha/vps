@@ -50,3 +50,18 @@ pronto.rafaelquintanilha.com {
 obs-chat.quantbrasil.com.br {
   reverse_proxy obs-chat-spotlight:3030
 }
+
+yt.rafaelquintanilha.com {
+  @healthz path /healthz
+
+  handle @healthz {
+    reverse_proxy yt-central:3000
+  }
+
+  handle {
+    basic_auth {
+      {$YT_CENTRAL_BASIC_AUTH_USER} {$YT_CENTRAL_BASIC_AUTH_HASH}
+    }
+    reverse_proxy yt-central:3000
+  }
+}

@@ -13,6 +13,8 @@ services:
     environment:
       - PRONTO_BASIC_AUTH_USER=${PRONTO_BASIC_AUTH_USER}
       - PRONTO_BASIC_AUTH_HASH=${PRONTO_BASIC_AUTH_HASH}
+      - YT_CENTRAL_BASIC_AUTH_USER=${YT_CENTRAL_BASIC_AUTH_USER}
+      - YT_CENTRAL_BASIC_AUTH_HASH=${YT_CENTRAL_BASIC_AUTH_HASH}
     networks:
       - web
 
@@ -184,6 +186,44 @@ services:
       - ./postgres/init:/docker-entrypoint-initdb.d
     networks:
       - web
+
+
+  yt-central:
+    build:
+      context: ./apps/yt-central
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "${YT_CENTRAL_PORT:-3002}:3000"
+    environment:
+      - DATABASE_URL=postgresql://${YT_CENTRAL_DB_USER}:${YT_CENTRAL_DB_PASS}@postgres:5432/${YT_CENTRAL_DB_NAME}
+      - YOUTUBE_API_KEY=${YOUTUBE_API_KEY}
+      - NODE_ENV=production
+      - PORT=3000
+    networks:
+      - web
+    depends_on:
+      - postgres
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://localhost:3000/healthz').then(r=>{if(!r.ok)process.exit(1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  yt-central-cron:
+    build:
+      context: ./apps/yt-central
+      dockerfile: Dockerfile.cron
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql://${YT_CENTRAL_DB_USER}:${YT_CENTRAL_DB_PASS}@postgres:5432/${YT_CENTRAL_DB_NAME}
+      - YOUTUBE_API_KEY=${YOUTUBE_API_KEY}
+      - TZ=${TIMEZONE}
+    networks:
+      - web
+    depends_on:
+      - postgres
 
 volumes:
   caddy_data:

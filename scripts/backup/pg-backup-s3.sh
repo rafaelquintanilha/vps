@@ -20,7 +20,7 @@ TIMESTAMP=$(date +'%Y%m%d_%H%M%S')
 DATE_FOLDER=$(date +'%Y/%m/%d')
 
 # Databases to backup
-DATABASES="postgres metabaseappdb pronto devqb_mc8b"
+DATABASES="postgres metabaseappdb pronto devqb_mc8b yt_central"
 
 # Load environment variables
 if [ -f /opt/apps/.env ]; then

@@ -46,3 +46,18 @@ EOSQL
 echo "Realstate Scraper database and user created successfully!"
 
 # You can add more database creation commands here for other apps
+# YT Central database
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
+    DO \$\$ BEGIN
+        IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '${YT_CENTRAL_DB_USER}') THEN
+            CREATE USER ${YT_CENTRAL_DB_USER} WITH PASSWORD '${YT_CENTRAL_DB_PASS}';
+        END IF;
+    END \$\$;
+    SELECT 'CREATE DATABASE ${YT_CENTRAL_DB_NAME} OWNER ${YT_CENTRAL_DB_USER}'
+    WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '${YT_CENTRAL_DB_NAME}')\gexec
+    GRANT ALL PRIVILEGES ON DATABASE ${YT_CENTRAL_DB_NAME} TO ${YT_CENTRAL_DB_USER};
+EOSQL
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "${YT_CENTRAL_DB_NAME}" <<-EOSQL
+    GRANT ALL ON SCHEMA public TO ${YT_CENTRAL_DB_USER};
+EOSQL
+echo "YT Central database created successfully!"

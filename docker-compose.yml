@@ -13,6 +13,8 @@ services:
     environment:
       - PRONTO_BASIC_AUTH_USER=${PRONTO_BASIC_AUTH_USER}
       - PRONTO_BASIC_AUTH_HASH=${PRONTO_BASIC_AUTH_HASH}
+      - ROBOI_BASIC_AUTH_USER=${ROBOI_BASIC_AUTH_USER}
+      - ROBOI_BASIC_AUTH_HASH=${ROBOI_BASIC_AUTH_HASH}
       - YT_CENTRAL_BASIC_AUTH_USER=${YT_CENTRAL_BASIC_AUTH_USER}
       - YT_CENTRAL_BASIC_AUTH_HASH=${YT_CENTRAL_BASIC_AUTH_HASH}
     networks:
@@ -115,6 +117,108 @@ services:
       timeout: 10s
       retries: 3
       start_period: 15s
+
+  roboi-opencode:
+    build:
+      context: ./apps/roboi
+      dockerfile: Dockerfile
+    restart: always
+    command: bun run start:opencode
+    working_dir: /app
+    ports:
+      - "127.0.0.1:4096:4096"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - OPENCODE_SERVER_USERNAME=${ROBOI_OPENCODE_SERVER_USERNAME:-opencode}
+      - OPENCODE_SERVER_PASSWORD=${ROBOI_OPENCODE_SERVER_PASSWORD}
+      - TZ=${TIMEZONE}
+    volumes:
+      - ./runtime/roboi/opencode:/root/.local/share/opencode
+    networks:
+      - web
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS -u \"$${OPENCODE_SERVER_USERNAME:-opencode}:$${OPENCODE_SERVER_PASSWORD}\" http://localhost:4096/session/status >/dev/null",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  roboi-api:
+    build:
+      context: ./apps/roboi
+      dockerfile: Dockerfile
+    restart: always
+    command: bun run start:api
+    working_dir: /app
+    ports:
+      - "127.0.0.1:${ROBOI_PORT:-3003}:3000"
+    environment:
+      - DATABASE_PATH=/data/roboi/roboi.db
+      - PORT=3000
+      - TZ=${TIMEZONE}
+    volumes:
+      - ./runtime/roboi/data:/data/roboi
+    networks:
+      - web
+    depends_on:
+      - roboi-opencode
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://localhost:3000/health').then(r=>{if(!r.ok)process.exit(1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  roboi-worker:
+    build:
+      context: ./apps/roboi
+      dockerfile: Dockerfile
+    restart: always
+    command: bun run start:worker
+    working_dir: /app
+    environment:
+      - DATABASE_PATH=/data/roboi/roboi.db
+      - OPENCODE_URL=http://roboi-opencode:4096
+      - OPENCODE_SERVER_USERNAME=${ROBOI_OPENCODE_SERVER_USERNAME:-opencode}
+      - OPENCODE_SERVER_PASSWORD=${ROBOI_OPENCODE_SERVER_PASSWORD}
+      - POLL_INTERVAL_MS=${ROBOI_POLL_INTERVAL_MS:-2000}
+      - WORKER_CONCURRENCY=${ROBOI_WORKER_CONCURRENCY:-3}
+      - JOB_TIMEOUT_MS=${ROBOI_JOB_TIMEOUT_MS:-600000}
+      - ROBOI_DATALAKE_URL=${ROBOI_DATALAKE_URL}
+      - ROBOI_DATALAKE_DEFAULT_LIMIT=${ROBOI_DATALAKE_DEFAULT_LIMIT:-200}
+      - ROBOI_DATALAKE_MAX_LIMIT=${ROBOI_DATALAKE_MAX_LIMIT:-1000}
+      - ROBOI_DATALAKE_STATEMENT_TIMEOUT_MS=${ROBOI_DATALAKE_STATEMENT_TIMEOUT_MS:-15000}
+      - ROBOI_DEFAULT_CLIENT_CODE=${ROBOI_DEFAULT_CLIENT_CODE}
+      - TZ=${TIMEZONE}
+    volumes:
+      - ./runtime/roboi/data:/data/roboi
+    networks:
+      - web
+    depends_on:
+      - roboi-opencode
+      - roboi-api
+
+  roboi-migrate:
+    build:
+      context: ./apps/roboi
+      dockerfile: Dockerfile
+    command: bun run db:migrate
+    working_dir: /app
+    profiles:
+      - manual
+    environment:
+      - DATABASE_PATH=/data/roboi/roboi.db
+      - TZ=${TIMEZONE}
+    volumes:
+      - ./runtime/roboi/data:/data/roboi
+    networks:
+      - web
 
   realstate-cron:
     build:

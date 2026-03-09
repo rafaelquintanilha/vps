@@ -1,0 +1,40 @@
+name: Deploy Roboi
+
+on:
+  repository_dispatch:
+    types:
+      - roboi-deploy
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: roboi-preview-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on:
+      - self-hosted
+      - Linux
+      - X64
+      - vps
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout vps repo
+        uses: actions/checkout@v4
+
+      - name: Sync live vps checkout
+        run: |
+          cd /opt/apps
+          git fetch origin master
+          git reset --hard origin/master
+          git clean -fd
+
+      - name: Ensure deploy script is executable
+        run: chmod +x /opt/apps/scripts/deploy-roboi.sh
+
+      - name: Deploy Roboi
+        run: /opt/apps/scripts/deploy-roboi.sh

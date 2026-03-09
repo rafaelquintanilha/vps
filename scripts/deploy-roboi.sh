@@ -38,23 +38,17 @@ wait_for_api() {
 }
 
 wait_for_opencode() {
-  local user="${ROBOI_OPENCODE_SERVER_USERNAME:-opencode}"
-  local password="${ROBOI_OPENCODE_SERVER_PASSWORD:-}"
-
-  if [ -z "$password" ]; then
-    log "ERROR: ROBOI_OPENCODE_SERVER_PASSWORD is not set"
-    return 1
-  fi
-
   log "Waiting for OpenCode health check..."
   for attempt in $(seq 1 30); do
-    HTTP_CODE="$(curl -sS -u "${user}:${password}" -o /dev/null -w '%{http_code}' "http://127.0.0.1:${OPENCODE_PORT}/session/status" || true)"
-    if [ "$HTTP_CODE" = "200" ]; then
+    CONTAINER_ID="$(docker compose ps -q roboi-opencode)"
+    STATUS="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$CONTAINER_ID" 2>/dev/null || true)"
+
+    if [ "$STATUS" = "healthy" ]; then
       log "OpenCode is healthy"
       return 0
     fi
 
-    log "OpenCode health check attempt $attempt/30 failed (HTTP $HTTP_CODE)"
+    log "OpenCode health check attempt $attempt/30 failed (status: ${STATUS:-unknown})"
     sleep 5
   done
 

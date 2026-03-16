@@ -6,6 +6,7 @@ REPO_DIR="/opt/apps/apps/roboi"
 REPO_URL="git@github.com:quantbrasil/roboi.git"
 COMPOSE_DIR="/opt/apps"
 LOG_FILE="/opt/apps/runtime/logs/roboi-deploy.log"
+PATCH_HELPER="/opt/apps/scripts/apply-roboi-opencode-auth-patch.sh"
 
 if [ -f /opt/apps/.env ]; then
   set -a
@@ -101,6 +102,12 @@ docker compose run --rm roboi-migrate
 
 log "Restarting Roboi services..."
 docker compose up -d roboi-opencode roboi-api roboi-worker
+
+log "Applying Roboi OpenCode Anthropic auth runtime patch..."
+"$PATCH_HELPER"
+
+log "Restarting patched Roboi runtime services..."
+docker compose restart roboi-opencode roboi-worker
 
 wait_for_opencode
 wait_for_api

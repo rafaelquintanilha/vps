@@ -1,0 +1,146 @@
+--- index.mjs
++++ index.mjs
+@@ -1,6 +1,103 @@
+ import { generatePKCE } from "@openauthjs/openauth/pkce";
++import { mkdir, rm, stat } from "node:fs/promises";
+ 
+ const CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
++const REFRESH_LOCK_DIR = "/tmp/opencode-anthropic-auth-refresh.lock";
++const REFRESH_LOCK_WAIT_MS = 250;
++const REFRESH_LOCK_TIMEOUT_MS = 15000;
++const REFRESH_LOCK_STALE_MS = 30000;
++
++function sleep(ms) {
++  return new Promise((resolve) => setTimeout(resolve, ms));
++}
++
++function applyAuthState(target, source) {
++  target.access = source.access;
++  target.refresh = source.refresh;
++  target.expires = source.expires;
++}
++
++async function withRefreshLock(task) {
++  const deadline = Date.now() + REFRESH_LOCK_TIMEOUT_MS;
++
++  while (true) {
++    try {
++      await mkdir(REFRESH_LOCK_DIR);
++      break;
++    } catch (error) {
++      if (error && error.code === "EEXIST") {
++        try {
++          const info = await stat(REFRESH_LOCK_DIR);
++          if (Date.now() - info.mtimeMs > REFRESH_LOCK_STALE_MS) {
++            await rm(REFRESH_LOCK_DIR, { recursive: true, force: true });
++            continue;
++          }
++        } catch {}
++
++        if (Date.now() >= deadline) {
++          throw new Error("Timed out waiting for Anthropic OAuth refresh lock");
++        }
++
++        await sleep(REFRESH_LOCK_WAIT_MS);
++        continue;
++      }
++
++      throw error;
++    }
++  }
++
++  try {
++    return await task();
++  } finally {
++    await rm(REFRESH_LOCK_DIR, { recursive: true, force: true });
++  }
++}
++
++async function refreshAccessToken(getAuth, client, auth) {
++  // Roboi runtime patch: serialize Anthropic OAuth refresh and keep in-memory auth state in sync.
++  await withRefreshLock(async () => {
++    const current = await getAuth();
++    if (current.type !== "oauth") return;
++
++    if (current.access && current.expires > Date.now()) {
++      applyAuthState(auth, current);
++      return;
++    }
++
++    const response = await fetch("https://console.anthropic.com/v1/oauth/token", {
++      method: "POST",
++      headers: {
++        "Content-Type": "application/json",
++      },
++      body: JSON.stringify({
++        grant_type: "refresh_token",
++        refresh_token: current.refresh || auth.refresh,
++        client_id: CLIENT_ID,
++      }),
++    });
++
++    if (!response.ok) {
++      throw new Error(`Token refresh failed: ${response.status}`);
++    }
++
++    const json = await response.json();
++    const next = {
++      type: "oauth",
++      refresh: json.refresh_token || current.refresh || auth.refresh,
++      access: json.access_token,
++      expires: Date.now() + json.expires_in * 1000,
++    };
++
++    await client.auth.set({
++      path: {
++        id: "anthropic",
++      },
++      body: next,
++    });
++
++    applyAuthState(auth, next);
++  });
++}
+ 
+ /**
+  * @param {"max" | "console"} mode
+@@ -104,37 +201,8 @@
+             async fetch(input, init) {
+               const auth = await getAuth();
+               if (auth.type !== "oauth") return fetch(input, init);
+-              if (!auth.access || auth.expires < Date.now()) {
+-                const response = await fetch(
+-                  "https://console.anthropic.com/v1/oauth/token",
+-                  {
+-                    method: "POST",
+-                    headers: {
+-                      "Content-Type": "application/json",
+-                    },
+-                    body: JSON.stringify({
+-                      grant_type: "refresh_token",
+-                      refresh_token: auth.refresh,
+-                      client_id: CLIENT_ID,
+-                    }),
+-                  },
+-                );
+-                if (!response.ok) {
+-                  throw new Error(`Token refresh failed: ${response.status}`);
+-                }
+-                const json = await response.json();
+-                await client.auth.set({
+-                  path: {
+-                    id: "anthropic",
+-                  },
+-                  body: {
+-                    type: "oauth",
+-                    refresh: json.refresh_token,
+-                    access: json.access_token,
+-                    expires: Date.now() + json.expires_in * 1000,
+-                  },
+-                });
+-                auth.access = json.access_token;
++              if (!auth.access || !auth.expires || auth.expires < Date.now()) {
++                await refreshAccessToken(getAuth, client, auth);
+               }
+               const requestInit = init ?? {};
+ 

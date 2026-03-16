@@ -1,6 +1,6 @@
 --- index.mjs
 +++ index.mjs
-@@ -1,6 +1,103 @@
+@@ -1,6 +1,168 @@
  import { generatePKCE } from "@openauthjs/openauth/pkce";
 +import { mkdir, rm, stat } from "node:fs/promises";
  
@@ -9,6 +9,7 @@
 +const REFRESH_LOCK_WAIT_MS = 250;
 +const REFRESH_LOCK_TIMEOUT_MS = 15000;
 +const REFRESH_LOCK_STALE_MS = 30000;
++const REFRESH_LOG_PREFIX = "[roboi-anthropic-auth]";
 +
 +function sleep(ms) {
 +  return new Promise((resolve) => setTimeout(resolve, ms));
@@ -18,6 +19,26 @@
 +  target.access = source.access;
 +  target.refresh = source.refresh;
 +  target.expires = source.expires;
++}
++
++function sanitizeRefreshLogValue(value) {
++  if (!value) return null;
++  return String(value)
++    .replace(/sk-ant-[A-Za-z0-9_-]+/g, "[redacted]")
++    .replace(/[A-Za-z0-9_-]{80,}/g, "[redacted]")
++    .slice(0, 240);
++}
++
++function logRefreshEvent(event, details = {}) {
++  try {
++    console.info(
++      `${REFRESH_LOG_PREFIX} ${JSON.stringify({
++        event,
++        at: new Date().toISOString(),
++        ...details,
++      })}`
++    );
++  } catch {}
 +}
 +
 +async function withRefreshLock(task) {
@@ -57,15 +78,34 @@
 +}
 +
 +async function refreshAccessToken(getAuth, client, auth) {
-+  // Roboi runtime patch: serialize Anthropic OAuth refresh and keep in-memory auth state in sync.
++  // Roboi runtime patch: serialize Anthropic OAuth refresh, preserve the refresh token, and keep in-memory auth state in sync.
 +  await withRefreshLock(async () => {
 +    const current = await getAuth();
 +    if (current.type !== "oauth") return;
 +
 +    if (current.access && current.expires > Date.now()) {
++      logRefreshEvent("refresh_reused_existing", {
++        expiresInMs: current.expires - Date.now(),
++      });
 +      applyAuthState(auth, current);
 +      return;
 +    }
++
++    const refreshToken = current.refresh || auth.refresh;
++    if (!refreshToken) {
++      logRefreshEvent("refresh_missing_token", {
++        hasCurrentRefresh: Boolean(current.refresh),
++        hasAuthRefresh: Boolean(auth.refresh),
++      });
++      throw new Error("Token refresh failed: missing refresh token");
++    }
++
++    logRefreshEvent("refresh_started", {
++      hasCurrentAccess: Boolean(current.access),
++      hasCurrentRefresh: Boolean(current.refresh),
++      hasAuthRefresh: Boolean(auth.refresh),
++      expiredByMs: typeof current.expires === "number" ? Date.now() - current.expires : null,
++    });
 +
 +    const response = await fetch("https://console.anthropic.com/v1/oauth/token", {
 +      method: "POST",
@@ -74,19 +114,38 @@
 +      },
 +      body: JSON.stringify({
 +        grant_type: "refresh_token",
-+        refresh_token: current.refresh || auth.refresh,
++        refresh_token: refreshToken,
 +        client_id: CLIENT_ID,
 +      }),
 +    });
 +
++    const raw = await response.text();
++    let json = null;
++    try {
++      json = raw ? JSON.parse(raw) : null;
++    } catch {}
++
 +    if (!response.ok) {
++      logRefreshEvent("refresh_failed", {
++        status: response.status,
++        bodyPreview: sanitizeRefreshLogValue(raw),
++        returnedRefreshToken: Boolean(json?.refresh_token),
++      });
 +      throw new Error(`Token refresh failed: ${response.status}`);
 +    }
 +
-+    const json = await response.json();
++    if (!json?.access_token || !json?.expires_in) {
++      logRefreshEvent("refresh_invalid_payload", {
++        status: response.status,
++        bodyPreview: sanitizeRefreshLogValue(raw),
++      });
++      throw new Error("Token refresh failed: invalid payload");
++    }
++
++    const nextRefresh = json.refresh_token || current.refresh || auth.refresh;
 +    const next = {
 +      type: "oauth",
-+      refresh: json.refresh_token || current.refresh || auth.refresh,
++      refresh: nextRefresh,
 +      access: json.access_token,
 +      expires: Date.now() + json.expires_in * 1000,
 +    };
@@ -98,13 +157,19 @@
 +      body: next,
 +    });
 +
++    logRefreshEvent("refresh_succeeded", {
++      expiresInSec: json.expires_in,
++      returnedRefreshToken: Boolean(json.refresh_token),
++      preservedRefreshToken: !json.refresh_token && Boolean(nextRefresh),
++    });
++
 +    applyAuthState(auth, next);
 +  });
 +}
  
  /**
   * @param {"max" | "console"} mode
-@@ -104,37 +201,8 @@
+@@ -104,37 +266,8 @@
              async fetch(input, init) {
                const auth = await getAuth();
                if (auth.type !== "oauth") return fetch(input, init);
@@ -143,4 +208,3 @@
 +                await refreshAccessToken(getAuth, client, auth);
                }
                const requestInit = init ?? {};
- 

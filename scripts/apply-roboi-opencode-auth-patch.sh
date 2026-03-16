@@ -6,7 +6,7 @@ COMPOSE_DIR="/opt/apps"
 SERVICE_NAME="roboi-opencode"
 TARGET_FILE="/root/.cache/opencode/node_modules/opencode-anthropic-auth/index.mjs"
 PATCH_FILE="/opt/apps/scripts/runtime-patches/opencode-anthropic-auth-refresh.patch"
-PATCH_MARKER="Roboi runtime patch: serialize Anthropic OAuth refresh and keep in-memory auth state in sync."
+PATCH_MARKER="Roboi runtime patch: serialize Anthropic OAuth refresh"
 
 TMP_DIR="$(mktemp -d)"
 

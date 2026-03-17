@@ -11,6 +11,7 @@ The stock plugin is not robust enough for Roboi's traffic pattern:
 - it persists refreshed auth state to storage, but only updates `auth.access` in memory
 - it does not keep `auth.refresh` or `auth.expires` in sync in memory
 - it does not emit enough refresh diagnostics to explain whether Anthropic returned a new refresh token or omitted it
+- after a successful refresh, the next request may still read stale auth from `getAuth()` instead of reusing the refreshed state
 
 In practice that led to repeated `Token refresh failed: 400` errors on the first real request after the token crossed its expiry boundary.
 
@@ -20,13 +21,14 @@ Runtime target inside the live `roboi-opencode` container:
 
 - `/root/.cache/opencode/node_modules/opencode-anthropic-auth/index.mjs`
 
-The patch does five things:
+The patch does six things:
 
 1. serializes refresh calls with a filesystem lock in `/tmp`
 2. re-reads current auth state after taking the lock so one request can reuse another request's successful refresh
 3. preserves the previous `refresh_token` when Anthropic omits a replacement in the refresh response
 4. updates in-memory `access`, `refresh`, and `expires` after a successful refresh
-5. emits sanitized refresh logs that show status, whether a refresh token was returned, and whether the old token had to be preserved
+5. maintains a process-local OAuth cache so the next request can reuse freshly refreshed auth without waiting on storage propagation
+6. emits sanitized refresh logs that show status, whether a refresh token was returned, whether the old token had to be preserved, and when cache was preferred over stale storage
 
 Patch artifact:
 
@@ -53,3 +55,4 @@ This is needed because the plugin lives in the container filesystem, so a contai
 - If the upstream plugin changes enough that the patch no longer applies cleanly, deploy will fail loudly instead of silently shipping the broken stock plugin.
 - If the plugin version changes in the future, review and update the patch before removing this mechanism.
 - Refresh diagnostics appear in the `roboi-opencode` container logs with the prefix `[roboi-anthropic-auth]`.
+- Cache reuse is logged as `auth_resolved_from_cache` when the process has fresher auth than the stored record returned by `getAuth()`.

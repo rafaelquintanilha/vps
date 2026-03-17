@@ -1,6 +1,6 @@
 --- index.mjs
 +++ index.mjs
-@@ -1,6 +1,168 @@
+@@ -1,6 +1,232 @@
  import { generatePKCE } from "@openauthjs/openauth/pkce";
 +import { mkdir, rm, stat } from "node:fs/promises";
  
@@ -10,9 +10,31 @@
 +const REFRESH_LOCK_TIMEOUT_MS = 15000;
 +const REFRESH_LOCK_STALE_MS = 30000;
 +const REFRESH_LOG_PREFIX = "[roboi-anthropic-auth]";
++let cachedOAuthAuth = null;
 +
 +function sleep(ms) {
 +  return new Promise((resolve) => setTimeout(resolve, ms));
++}
++
++function cloneOAuthAuth(source) {
++  if (!source || source.type !== "oauth") {
++    return null;
++  }
++
++  return {
++    type: "oauth",
++    access: source.access || "",
++    refresh: source.refresh || "",
++    expires: typeof source.expires === "number" ? source.expires : 0,
++  };
++}
++
++function isUsableOAuthAuth(source) {
++  return Boolean(source?.type === "oauth");
++}
++
++function isFreshOAuthAuth(source) {
++  return Boolean(source?.access) && typeof source?.expires === "number" && source.expires > Date.now();
 +}
 +
 +function applyAuthState(target, source) {
@@ -39,6 +61,48 @@
 +      })}`
 +    );
 +  } catch {}
++}
++
++function updateCachedOAuthAuth(next) {
++  const clone = cloneOAuthAuth(next);
++  cachedOAuthAuth = clone;
++  return clone;
++}
++
++function resolveOAuthAuth(storedAuth, fallbackAuth) {
++  const candidates = [cachedOAuthAuth, storedAuth, fallbackAuth]
++    .map(cloneOAuthAuth)
++    .filter(Boolean);
++
++  if (candidates.length === 0) {
++    cachedOAuthAuth = null;
++    return null;
++  }
++
++  let selected = candidates[0];
++  for (const candidate of candidates.slice(1)) {
++    if ((candidate.expires || 0) > (selected.expires || 0)) {
++      selected = candidate;
++    }
++  }
++
++  const storedClone = cloneOAuthAuth(storedAuth);
++  const cachedClone = cloneOAuthAuth(cachedOAuthAuth);
++  if (
++    cachedClone &&
++    storedClone &&
++    typeof cachedClone.expires === "number" &&
++    typeof storedClone.expires === "number" &&
++    cachedClone.expires > storedClone.expires
++  ) {
++    logRefreshEvent("auth_resolved_from_cache", {
++      cachedExpiresInMs: cachedClone.expires - Date.now(),
++      storedExpiredByMs: Date.now() - storedClone.expires,
++    });
++  }
++
++  cachedOAuthAuth = cloneOAuthAuth(selected);
++  return cloneOAuthAuth(selected);
 +}
 +
 +async function withRefreshLock(task) {
@@ -80,10 +144,10 @@
 +async function refreshAccessToken(getAuth, client, auth) {
 +  // Roboi runtime patch: serialize Anthropic OAuth refresh, preserve the refresh token, and keep in-memory auth state in sync.
 +  await withRefreshLock(async () => {
-+    const current = await getAuth();
-+    if (current.type !== "oauth") return;
++    const current = resolveOAuthAuth(await getAuth(), auth);
++    if (!current) return;
 +
-+    if (current.access && current.expires > Date.now()) {
++    if (isFreshOAuthAuth(current)) {
 +      logRefreshEvent("refresh_reused_existing", {
 +        expiresInMs: current.expires - Date.now(),
 +      });
@@ -142,14 +206,14 @@
 +      throw new Error("Token refresh failed: invalid payload");
 +    }
 +
-+    const nextRefresh = json.refresh_token || current.refresh || auth.refresh;
 +    const next = {
 +      type: "oauth",
-+      refresh: nextRefresh,
++      refresh: json.refresh_token || current.refresh || auth.refresh,
 +      access: json.access_token,
 +      expires: Date.now() + json.expires_in * 1000,
 +    };
 +
++    updateCachedOAuthAuth(next);
 +    await client.auth.set({
 +      path: {
 +        id: "anthropic",
@@ -160,7 +224,7 @@
 +    logRefreshEvent("refresh_succeeded", {
 +      expiresInSec: json.expires_in,
 +      returnedRefreshToken: Boolean(json.refresh_token),
-+      preservedRefreshToken: !json.refresh_token && Boolean(nextRefresh),
++      preservedRefreshToken: !json.refresh_token && Boolean(next.refresh),
 +    });
 +
 +    applyAuthState(auth, next);
@@ -169,10 +233,22 @@
  
  /**
   * @param {"max" | "console"} mode
-@@ -104,37 +266,8 @@
+@@ -82,7 +308,8 @@
+     auth: {
+       provider: "anthropic",
+       async loader(getAuth, provider) {
+-        const auth = await getAuth();
++        const auth = resolveOAuthAuth(await getAuth());
++        if (!auth) return;
+         if (auth.type === "oauth") {
+           // zero out cost for max plan
+           for (const model of Object.values(provider.models)) {
+@@ -102,39 +329,14 @@
+              * @param {any} init
+              */
              async fetch(input, init) {
-               const auth = await getAuth();
-               if (auth.type !== "oauth") return fetch(input, init);
+-              const auth = await getAuth();
+-              if (auth.type !== "oauth") return fetch(input, init);
 -              if (!auth.access || auth.expires < Date.now()) {
 -                const response = await fetch(
 -                  "https://console.anthropic.com/v1/oauth/token",
@@ -204,7 +280,13 @@
 -                  },
 -                });
 -                auth.access = json.access_token;
-+              if (!auth.access || !auth.expires || auth.expires < Date.now()) {
++              const storedAuth = await getAuth();
++              if (!isUsableOAuthAuth(storedAuth)) {
++                cachedOAuthAuth = null;
++                return fetch(input, init);
++              }
++              const auth = resolveOAuthAuth(storedAuth);
++              if (!auth || !isFreshOAuthAuth(auth)) {
 +                await refreshAccessToken(getAuth, client, auth);
                }
                const requestInit = init ?? {};

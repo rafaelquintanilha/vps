@@ -6,7 +6,7 @@ REPO_DIR="/opt/apps/apps/roboi"
 REPO_URL="git@github.com:quantbrasil/roboi.git"
 COMPOSE_DIR="/opt/apps"
 LOG_FILE="/opt/apps/runtime/logs/roboi-deploy.log"
-PATCH_HELPER="/opt/apps/scripts/apply-roboi-opencode-auth-patch.sh"
+AUTH_RENDERER="/opt/apps/scripts/render-roboi-opencode-auth.sh"
 
 if [ -f /opt/apps/.env ]; then
   set -a
@@ -66,6 +66,11 @@ mkdir -p /opt/apps/runtime/roboi/data
 mkdir -p /opt/apps/runtime/roboi/opencode
 mkdir -p /opt/apps/apps
 
+if [ ! -x "$AUTH_RENDERER" ]; then
+  log "ERROR: auth renderer is missing or not executable: $AUTH_RENDERER"
+  exit 1
+fi
+
 if [ ! -d "$REPO_DIR/.git" ]; then
   log "Cloning Roboi repository..."
   git clone "$REPO_URL" "$REPO_DIR"
@@ -94,6 +99,9 @@ fi
 
 cd "$COMPOSE_DIR"
 
+log "Rendering Roboi OpenCode auth from ROBOI_ANTHROPIC_API_KEY..."
+"$AUTH_RENDERER"
+
 log "Building Roboi services..."
 docker compose build roboi-opencode roboi-api roboi-worker roboi-migrate
 
@@ -102,12 +110,6 @@ docker compose run --rm roboi-migrate
 
 log "Restarting Roboi services..."
 docker compose up -d roboi-opencode roboi-api roboi-worker
-
-log "Applying Roboi OpenCode Anthropic auth runtime patch..."
-"$PATCH_HELPER"
-
-log "Restarting patched Roboi runtime services..."
-docker compose restart roboi-opencode roboi-worker
 
 wait_for_opencode
 wait_for_api

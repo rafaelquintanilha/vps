@@ -2,14 +2,20 @@
 
 set -euo pipefail
 
-AUTH_DIR="/opt/apps/runtime/roboi/opencode"
-AUTH_FILE="${AUTH_DIR}/auth.json"
-
 if [ -f /opt/apps/.env ]; then
   set -a
   source /opt/apps/.env
   set +a
 fi
+
+if [ -n "${ROBOI_ENV_FILE:-}" ] && [ -f "$ROBOI_ENV_FILE" ]; then
+  set -a
+  source "$ROBOI_ENV_FILE"
+  set +a
+fi
+
+AUTH_DIR="${ROBOI_AUTH_DIR:-/opt/apps/runtime/roboi/opencode}"
+AUTH_FILE="${AUTH_DIR}/auth.json"
 
 if [ -z "${ROBOI_ANTHROPIC_API_KEY:-}" ]; then
   echo "ERROR: ROBOI_ANTHROPIC_API_KEY is not set" >&2

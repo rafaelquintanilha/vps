@@ -51,7 +51,7 @@ obs-chat.quantbrasil.com.br {
   reverse_proxy obs-chat-spotlight:3030
 }
 
-roboi.rafaelquintanilha.com, roboi.69.62.89.22.nip.io {
+roboi.rafaelquintanilha.com, inteligencia.pontasales.com.br, roboi.69.62.89.22.nip.io {
   header X-Robots-Tag "noindex, nofollow"
 
   @health path /health

@@ -110,6 +110,15 @@ project_name_for_instance() {
   printf "roboi-%s" "$slug"
 }
 
+caddy_site_addresses() {
+  local hosts="$1"
+
+  printf "%s" "$hosts" \
+    | tr "," "\n" \
+    | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//' \
+    | awk 'NF { values[++count] = $0 } END { for (i = 1; i <= count; i++) printf "%s%s", values[i], (i < count ? ", " : "") }'
+}
+
 stop_legacy_containers() {
   local stopped=0
   local names=(
@@ -414,8 +423,11 @@ render_caddy_instances() {
     [ -n "$env_file" ] || continue
     load_instance_env "$env_file"
 
+    local site_addresses
+    site_addresses="$(caddy_site_addresses "$ROBOI_HOSTS")"
+
     cat >> "$tmp_file" <<EOF
-${ROBOI_HOSTS} {
+${site_addresses} {
   header X-Robots-Tag "noindex, nofollow"
 
   @health path /health

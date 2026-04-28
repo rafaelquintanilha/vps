@@ -477,6 +477,9 @@ reload_caddy() {
 }
 
 main() {
+  local env_files=()
+  local env_file
+
   mkdir -p /opt/apps/runtime/logs
   mkdir -p "$INSTANCE_ROOT"
   mkdir -p "$CADDY_INSTANCE_DIR"
@@ -492,10 +495,11 @@ main() {
   build_image
   ensure_legacy_instance_if_needed
 
-  while IFS= read -r env_file; do
-    [ -n "$env_file" ] || continue
+  mapfile -t env_files < <(instance_env_files)
+
+  for env_file in "${env_files[@]}"; do
     deploy_instance "$env_file"
-  done < <(instance_env_files)
+  done
 
   render_caddy_instances
   reload_caddy

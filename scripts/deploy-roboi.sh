@@ -463,6 +463,9 @@ reload_caddy() {
     -v "${CADDY_INSTANCE_DIR}:/etc/caddy/roboi-instances:ro" \
     caddy:2 caddy validate --config /etc/caddy/Caddyfile
 
+  log "Validating Caddy config through docker compose..."
+  docker compose run --rm --no-deps caddy caddy validate --config /etc/caddy/Caddyfile
+
   log "Ensuring Caddy has the current Roboi route mount and Caddyfile..."
   docker compose up -d --force-recreate caddy
 

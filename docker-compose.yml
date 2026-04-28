@@ -11,11 +11,9 @@ services:
       - caddy_data:/data
       - caddy_config:/config
       - ./apps/pronto/apps/client/dist/public:/srv/pronto-frontend:ro
-    environment:
-      - PRONTO_BASIC_AUTH_USER=${PRONTO_BASIC_AUTH_USER}
-      - PRONTO_BASIC_AUTH_HASH=${PRONTO_BASIC_AUTH_HASH}
-      - YT_CENTRAL_BASIC_AUTH_USER=${YT_CENTRAL_BASIC_AUTH_USER}
-      - YT_CENTRAL_BASIC_AUTH_HASH=${YT_CENTRAL_BASIC_AUTH_HASH}
+    env_file:
+      - path: .env
+        required: false
     networks:
       - web
 

@@ -61,9 +61,6 @@ roboi.rafaelquintanilha.com, roboi.69.62.89.22.nip.io {
   }
 
   handle {
-    basic_auth {
-      {$ROBOI_BASIC_AUTH_USER} {$ROBOI_BASIC_AUTH_HASH}
-    }
     reverse_proxy roboi-api:3000
   }
 }

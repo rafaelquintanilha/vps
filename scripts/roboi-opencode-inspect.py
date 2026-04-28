@@ -1,20 +1,42 @@
 #!/usr/bin/env python3
 import argparse
 import json
+import os
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 
-APP_DB = Path("/opt/apps/runtime/roboi/data/roboi.db")
-OPENCODE_DB = Path("/opt/apps/runtime/roboi/opencode/opencode.db")
+INSTANCE_ROOT = Path(os.environ.get("ROBOI_INSTANCE_ROOT", "/opt/apps/runtime/roboi-instances"))
+LEGACY_APP_DB = Path("/opt/apps/runtime/roboi/data/roboi.db")
+LEGACY_OPENCODE_DB = Path("/opt/apps/runtime/roboi/opencode/opencode.db")
 
 
 def connect(path: Path) -> sqlite3.Connection:
+    if not path.exists():
+        raise SystemExit(f"SQLite database not found: {path}")
+
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def resolve_db_paths(instance: str | None) -> tuple[Path, Path]:
+    if instance:
+        instance_dir = INSTANCE_ROOT / instance
+        return instance_dir / "data" / "roboi.db", instance_dir / "opencode" / "opencode.db"
+
+    if INSTANCE_ROOT.exists():
+        instance_dirs = sorted(path.parent for path in INSTANCE_ROOT.glob("*/instance.env"))
+        if len(instance_dirs) == 1:
+            instance_dir = instance_dirs[0]
+            return instance_dir / "data" / "roboi.db", instance_dir / "opencode" / "opencode.db"
+        if len(instance_dirs) > 1:
+            names = ", ".join(path.name for path in instance_dirs)
+            raise SystemExit(f"Multiple Roboi instances found ({names}); pass --instance <client-id>.")
+
+    return LEGACY_APP_DB, LEGACY_OPENCODE_DB
 
 
 def fmt_ts(value: Any) -> str:
@@ -253,10 +275,12 @@ def main() -> int:
     parser.add_argument("--job-id", help="Roboi job ID to inspect.")
     parser.add_argument("--thread-key", help="Roboi thread key to inspect.")
     parser.add_argument("--opencode-session-id", help="OpenCode session ID to inspect directly.")
+    parser.add_argument("--instance", help="Roboi instance client id. Required when multiple instances exist.")
     args = parser.parse_args()
 
-    app = connect(APP_DB)
-    opencode = connect(OPENCODE_DB)
+    app_db, opencode_db = resolve_db_paths(args.instance)
+    app = connect(app_db)
+    opencode = connect(opencode_db)
 
     if args.recent:
         list_recent(app, opencode, max(1, args.limit))

@@ -12,3 +12,7 @@ This repository contains the infrastructure configuration for the VPS hosting mu
 ## Deployment
 
 Webhook-triggered deployment pipeline with cron monitoring.
+
+## Roboi
+
+Roboi runs as isolated per-client instances. See [docs/roboi-instances.md](docs/roboi-instances.md) for instance creation, deployment, and local user management.

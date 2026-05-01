@@ -45,7 +45,11 @@ if [ -e "$ENV_FILE" ]; then
   exit 1
 fi
 
-mkdir -p "${INSTANCE_DIR}/data" "${INSTANCE_DIR}/opencode"
+mkdir -p \
+  "${INSTANCE_DIR}/data" \
+  "${INSTANCE_DIR}/opencode/admin" \
+  "${INSTANCE_DIR}/opencode/owner" \
+  "${INSTANCE_DIR}/opencode/operator"
 
 cat > "$ENV_FILE" <<EOF
 # Roboi instance runtime config. Keep this file out of git.
@@ -54,7 +58,9 @@ ROBOI_HOSTS=$(quote_env_value "$HOSTS")
 ROBOI_DEFAULT_CLIENT_CODE=$(quote_env_value "$CLIENT_ID")
 
 # Required per instance.
-ROBOI_DATALAKE_URL=''
+ROBOI_DATALAKE_URL_ADMIN=''
+ROBOI_DATALAKE_URL_OWNER=''
+ROBOI_DATALAKE_URL_OPERATOR=''
 ROBOI_OPENCODE_SERVER_USERNAME='opencode'
 ROBOI_OPENCODE_SERVER_PASSWORD=''
 ROBOI_ANTHROPIC_API_KEY=''
@@ -75,6 +81,7 @@ Created Roboi instance scaffold:
   $INSTANCE_DIR
 
 Next steps:
-  1. Fill required secrets and credentials in $ENV_FILE
-  2. Run /opt/apps/scripts/deploy-roboi.sh
+  1. Provision data-lake roles with /opt/apps/scripts/provision-roboi-datalake-client.sh $CLIENT_ID
+  2. Fill required secrets and credentials in $ENV_FILE
+  3. Run /opt/apps/scripts/deploy-roboi.sh
 EOF

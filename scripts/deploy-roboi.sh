@@ -70,6 +70,9 @@ reset_roboi_instance_env() {
   unset ROBOI_HOSTS
   unset ROBOI_DEFAULT_CLIENT_CODE
   unset ROBOI_DATALAKE_URL
+  unset ROBOI_DATALAKE_URL_ADMIN
+  unset ROBOI_DATALAKE_URL_OWNER
+  unset ROBOI_DATALAKE_URL_OPERATOR
   unset ROBOI_DATALAKE_DEFAULT_LIMIT
   unset ROBOI_DATALAKE_MAX_LIMIT
   unset ROBOI_DATALAKE_STATEMENT_TIMEOUT_MS
@@ -83,6 +86,9 @@ reset_roboi_instance_env() {
   unset ROBOI_INSTANCE_DIR
   unset ROBOI_DOCKER_PROJECT
   unset ROBOI_OPENCODE_CONTAINER
+  unset ROBOI_OPENCODE_ADMIN_CONTAINER
+  unset ROBOI_OPENCODE_OWNER_CONTAINER
+  unset ROBOI_OPENCODE_OPERATOR_CONTAINER
   unset ROBOI_API_CONTAINER
   unset ROBOI_ENV_FILE
   unset ROBOI_AUTH_DIR
@@ -190,7 +196,9 @@ ensure_legacy_instance_if_needed() {
 
   local instance_id="$ROBOI_DEFAULT_CLIENT_CODE"
   validate_instance_id "$instance_id"
-  require_non_empty_legacy_value "ROBOI_DATALAKE_URL"
+  require_non_empty_legacy_value "ROBOI_DATALAKE_URL_ADMIN"
+  require_non_empty_legacy_value "ROBOI_DATALAKE_URL_OWNER"
+  require_non_empty_legacy_value "ROBOI_DATALAKE_URL_OPERATOR"
   require_non_empty_legacy_value "ROBOI_OPENCODE_SERVER_PASSWORD"
   require_non_empty_legacy_value "ROBOI_ANTHROPIC_API_KEY"
 
@@ -201,7 +209,11 @@ ensure_legacy_instance_if_needed() {
 
   log "No Roboi instance folders found; creating initial instance for client ${instance_id}."
 
-  mkdir -p "$instance_dir/data" "$instance_dir/opencode"
+  mkdir -p \
+    "$instance_dir/data" \
+    "$instance_dir/opencode/admin" \
+    "$instance_dir/opencode/owner" \
+    "$instance_dir/opencode/operator"
 
   if [ -d "$LEGACY_RUNTIME_DIR" ]; then
     stop_legacy_containers
@@ -213,7 +225,9 @@ ensure_legacy_instance_if_needed() {
     fi
 
     if [ -d "${LEGACY_RUNTIME_DIR}/opencode" ]; then
-      cp -a "${LEGACY_RUNTIME_DIR}/opencode/." "${instance_dir}/opencode/"
+      for role in admin owner operator; do
+        cp -a "${LEGACY_RUNTIME_DIR}/opencode/." "${instance_dir}/opencode/${role}/"
+      done
     fi
   fi
 
@@ -222,7 +236,9 @@ ensure_legacy_instance_if_needed() {
       printf "# Roboi instance runtime config. Keep this file out of git.\n"
       printf "ROBOI_HOSTS=%s\n" "$(quote_env_value "$legacy_hosts")"
       printf "ROBOI_DEFAULT_CLIENT_CODE=%s\n" "$(quote_env_value "$instance_id")"
-      write_env_line_required "ROBOI_DATALAKE_URL"
+      write_env_line_required "ROBOI_DATALAKE_URL_ADMIN"
+      write_env_line_required "ROBOI_DATALAKE_URL_OWNER"
+      write_env_line_required "ROBOI_DATALAKE_URL_OPERATOR"
       write_env_line "ROBOI_DATALAKE_DEFAULT_LIMIT"
       write_env_line "ROBOI_DATALAKE_MAX_LIMIT"
       write_env_line "ROBOI_DATALAKE_STATEMENT_TIMEOUT_MS"
@@ -300,6 +316,19 @@ require_non_empty_instance_value() {
   fi
 }
 
+require_distinct_instance_values() {
+  local env_file="$1"
+  local left_key="$2"
+  local right_key="$3"
+  local left_value="${!left_key:-}"
+  local right_value="${!right_key:-}"
+
+  if [ "$left_value" = "$right_value" ]; then
+    log "ERROR: ${env_file} must use distinct credentials for ${left_key} and ${right_key}."
+    exit 1
+  fi
+}
+
 load_instance_env() {
   local env_file="$1"
   local instance_dir
@@ -316,7 +345,9 @@ load_instance_env() {
 
   require_instance_key "$env_file" "ROBOI_HOSTS"
   require_instance_key "$env_file" "ROBOI_DEFAULT_CLIENT_CODE"
-  require_instance_key "$env_file" "ROBOI_DATALAKE_URL"
+  require_instance_key "$env_file" "ROBOI_DATALAKE_URL_ADMIN"
+  require_instance_key "$env_file" "ROBOI_DATALAKE_URL_OWNER"
+  require_instance_key "$env_file" "ROBOI_DATALAKE_URL_OPERATOR"
   require_instance_key "$env_file" "ROBOI_OPENCODE_SERVER_PASSWORD"
   require_instance_key "$env_file" "ROBOI_ANTHROPIC_API_KEY"
 
@@ -329,7 +360,12 @@ load_instance_env() {
 
   require_non_empty_instance_value "$env_file" "ROBOI_HOSTS"
   require_non_empty_instance_value "$env_file" "ROBOI_DEFAULT_CLIENT_CODE"
-  require_non_empty_instance_value "$env_file" "ROBOI_DATALAKE_URL"
+  require_non_empty_instance_value "$env_file" "ROBOI_DATALAKE_URL_ADMIN"
+  require_non_empty_instance_value "$env_file" "ROBOI_DATALAKE_URL_OWNER"
+  require_non_empty_instance_value "$env_file" "ROBOI_DATALAKE_URL_OPERATOR"
+  require_distinct_instance_values "$env_file" "ROBOI_DATALAKE_URL_ADMIN" "ROBOI_DATALAKE_URL_OWNER"
+  require_distinct_instance_values "$env_file" "ROBOI_DATALAKE_URL_ADMIN" "ROBOI_DATALAKE_URL_OPERATOR"
+  require_distinct_instance_values "$env_file" "ROBOI_DATALAKE_URL_OWNER" "ROBOI_DATALAKE_URL_OPERATOR"
   require_non_empty_instance_value "$env_file" "ROBOI_OPENCODE_SERVER_PASSWORD"
   require_non_empty_instance_value "$env_file" "ROBOI_ANTHROPIC_API_KEY"
 
@@ -338,13 +374,17 @@ load_instance_env() {
   ROBOI_INSTANCE_ID="$instance_id"
   ROBOI_INSTANCE_DIR="$instance_dir"
   ROBOI_DOCKER_PROJECT="$project_name"
-  ROBOI_OPENCODE_CONTAINER="${project_name}-opencode"
+  ROBOI_OPENCODE_ADMIN_CONTAINER="${project_name}-opencode-admin"
+  ROBOI_OPENCODE_OWNER_CONTAINER="${project_name}-opencode-owner"
+  ROBOI_OPENCODE_OPERATOR_CONTAINER="${project_name}-opencode-operator"
   ROBOI_API_CONTAINER="${project_name}-api"
 
   export ROBOI_INSTANCE_ID
   export ROBOI_INSTANCE_DIR
   export ROBOI_DOCKER_PROJECT
-  export ROBOI_OPENCODE_CONTAINER
+  export ROBOI_OPENCODE_ADMIN_CONTAINER
+  export ROBOI_OPENCODE_OWNER_CONTAINER
+  export ROBOI_OPENCODE_OPERATOR_CONTAINER
   export ROBOI_API_CONTAINER
 }
 
@@ -386,15 +426,21 @@ render_instance_auth() {
     exit 1
   fi
 
-  log "Rendering OpenCode auth for Roboi instance ${ROBOI_INSTANCE_ID}..."
-  ROBOI_ENV_FILE="$env_file" ROBOI_AUTH_DIR="${ROBOI_INSTANCE_DIR}/opencode" "$AUTH_RENDERER"
+  for role in admin owner operator; do
+    log "Rendering ${role} OpenCode auth for Roboi instance ${ROBOI_INSTANCE_ID}..."
+    ROBOI_ENV_FILE="$env_file" ROBOI_AUTH_DIR="${ROBOI_INSTANCE_DIR}/opencode/${role}" "$AUTH_RENDERER"
+  done
 }
 
 deploy_instance() {
   local env_file="$1"
 
   load_instance_env "$env_file"
-  mkdir -p "${ROBOI_INSTANCE_DIR}/data" "${ROBOI_INSTANCE_DIR}/opencode"
+  mkdir -p \
+    "${ROBOI_INSTANCE_DIR}/data" \
+    "${ROBOI_INSTANCE_DIR}/opencode/admin" \
+    "${ROBOI_INSTANCE_DIR}/opencode/owner" \
+    "${ROBOI_INSTANCE_DIR}/opencode/operator"
 
   render_instance_auth "$env_file"
 
@@ -402,9 +448,11 @@ deploy_instance() {
   compose_for_instance --profile manual run --rm migrate
 
   log "Restarting Roboi instance ${ROBOI_INSTANCE_ID}..."
-  compose_for_instance up -d opencode api worker
+  compose_for_instance up -d --remove-orphans opencode-admin opencode-owner opencode-operator api worker
 
-  wait_for_service_health "opencode" "OpenCode"
+  wait_for_service_health "opencode-admin" "admin OpenCode"
+  wait_for_service_health "opencode-owner" "owner OpenCode"
+  wait_for_service_health "opencode-operator" "operator OpenCode"
   wait_for_service_health "api" "API"
 }
 

@@ -1,7 +1,7 @@
 services:
-  opencode:
+  opencode-admin:
     image: ${ROBOI_IMAGE:?ROBOI_IMAGE is required}
-    container_name: ${ROBOI_OPENCODE_CONTAINER:?ROBOI_OPENCODE_CONTAINER is required}
+    container_name: ${ROBOI_OPENCODE_ADMIN_CONTAINER:?ROBOI_OPENCODE_ADMIN_CONTAINER is required}
     restart: always
     command: bun run start:opencode
     working_dir: /app
@@ -10,14 +10,78 @@ services:
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - OPENCODE_SERVER_USERNAME=${ROBOI_OPENCODE_SERVER_USERNAME:-opencode}
       - OPENCODE_SERVER_PASSWORD=${ROBOI_OPENCODE_SERVER_PASSWORD:?ROBOI_OPENCODE_SERVER_PASSWORD is required}
-      - ROBOI_DATALAKE_URL=${ROBOI_DATALAKE_URL:?ROBOI_DATALAKE_URL is required}
+      - ROBOI_DATALAKE_URL=${ROBOI_DATALAKE_URL_ADMIN:?ROBOI_DATALAKE_URL_ADMIN is required}
       - ROBOI_DATALAKE_DEFAULT_LIMIT=${ROBOI_DATALAKE_DEFAULT_LIMIT:-200}
       - ROBOI_DATALAKE_MAX_LIMIT=${ROBOI_DATALAKE_MAX_LIMIT:-1000}
       - ROBOI_DATALAKE_STATEMENT_TIMEOUT_MS=${ROBOI_DATALAKE_STATEMENT_TIMEOUT_MS:-15000}
       - ROBOI_DEFAULT_CLIENT_CODE=${ROBOI_DEFAULT_CLIENT_CODE:?ROBOI_DEFAULT_CLIENT_CODE is required}
       - TZ=${TIMEZONE:-UTC}
     volumes:
-      - ${ROBOI_INSTANCE_DIR:?ROBOI_INSTANCE_DIR is required}/opencode:/root/.local/share/opencode
+      - ${ROBOI_INSTANCE_DIR:?ROBOI_INSTANCE_DIR is required}/opencode/admin:/root/.local/share/opencode
+    networks:
+      - web
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS -u \"$${OPENCODE_SERVER_USERNAME:-opencode}:$${OPENCODE_SERVER_PASSWORD}\" http://localhost:4096/session/status >/dev/null",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  opencode-owner:
+    image: ${ROBOI_IMAGE:?ROBOI_IMAGE is required}
+    container_name: ${ROBOI_OPENCODE_OWNER_CONTAINER:?ROBOI_OPENCODE_OWNER_CONTAINER is required}
+    restart: always
+    command: bun run start:opencode
+    working_dir: /app
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - OPENCODE_SERVER_USERNAME=${ROBOI_OPENCODE_SERVER_USERNAME:-opencode}
+      - OPENCODE_SERVER_PASSWORD=${ROBOI_OPENCODE_SERVER_PASSWORD:?ROBOI_OPENCODE_SERVER_PASSWORD is required}
+      - ROBOI_DATALAKE_URL=${ROBOI_DATALAKE_URL_OWNER:?ROBOI_DATALAKE_URL_OWNER is required}
+      - ROBOI_DATALAKE_DEFAULT_LIMIT=${ROBOI_DATALAKE_DEFAULT_LIMIT:-200}
+      - ROBOI_DATALAKE_MAX_LIMIT=${ROBOI_DATALAKE_MAX_LIMIT:-1000}
+      - ROBOI_DATALAKE_STATEMENT_TIMEOUT_MS=${ROBOI_DATALAKE_STATEMENT_TIMEOUT_MS:-15000}
+      - ROBOI_DEFAULT_CLIENT_CODE=${ROBOI_DEFAULT_CLIENT_CODE:?ROBOI_DEFAULT_CLIENT_CODE is required}
+      - TZ=${TIMEZONE:-UTC}
+    volumes:
+      - ${ROBOI_INSTANCE_DIR:?ROBOI_INSTANCE_DIR is required}/opencode/owner:/root/.local/share/opencode
+    networks:
+      - web
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS -u \"$${OPENCODE_SERVER_USERNAME:-opencode}:$${OPENCODE_SERVER_PASSWORD}\" http://localhost:4096/session/status >/dev/null",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  opencode-operator:
+    image: ${ROBOI_IMAGE:?ROBOI_IMAGE is required}
+    container_name: ${ROBOI_OPENCODE_OPERATOR_CONTAINER:?ROBOI_OPENCODE_OPERATOR_CONTAINER is required}
+    restart: always
+    command: bun run start:opencode
+    working_dir: /app
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - OPENCODE_SERVER_USERNAME=${ROBOI_OPENCODE_SERVER_USERNAME:-opencode}
+      - OPENCODE_SERVER_PASSWORD=${ROBOI_OPENCODE_SERVER_PASSWORD:?ROBOI_OPENCODE_SERVER_PASSWORD is required}
+      - ROBOI_DATALAKE_URL=${ROBOI_DATALAKE_URL_OPERATOR:?ROBOI_DATALAKE_URL_OPERATOR is required}
+      - ROBOI_DATALAKE_DEFAULT_LIMIT=${ROBOI_DATALAKE_DEFAULT_LIMIT:-200}
+      - ROBOI_DATALAKE_MAX_LIMIT=${ROBOI_DATALAKE_MAX_LIMIT:-1000}
+      - ROBOI_DATALAKE_STATEMENT_TIMEOUT_MS=${ROBOI_DATALAKE_STATEMENT_TIMEOUT_MS:-15000}
+      - ROBOI_DEFAULT_CLIENT_CODE=${ROBOI_DEFAULT_CLIENT_CODE:?ROBOI_DEFAULT_CLIENT_CODE is required}
+      - TZ=${TIMEZONE:-UTC}
+    volumes:
+      - ${ROBOI_INSTANCE_DIR:?ROBOI_INSTANCE_DIR is required}/opencode/operator:/root/.local/share/opencode
     networks:
       - web
     healthcheck:
@@ -45,8 +109,6 @@ services:
       - ${ROBOI_INSTANCE_DIR:?ROBOI_INSTANCE_DIR is required}/data:/data/roboi
     networks:
       - web
-    depends_on:
-      - opencode
     healthcheck:
       test: ["CMD", "bun", "-e", "fetch('http://localhost:3000/health').then(r=>{if(!r.ok)process.exit(1)})"]
       interval: 30s
@@ -59,25 +121,26 @@ services:
     restart: always
     command: bun run start:worker
     working_dir: /app
-    network_mode: "service:opencode"
     environment:
       - DATABASE_PATH=/data/roboi/roboi.db
-      - OPENCODE_URL=http://127.0.0.1:4096
+      - OPENCODE_URL_ADMIN=http://opencode-admin:4096
+      - OPENCODE_URL_OWNER=http://opencode-owner:4096
+      - OPENCODE_URL_OPERATOR=http://opencode-operator:4096
       - OPENCODE_SERVER_USERNAME=${ROBOI_OPENCODE_SERVER_USERNAME:-opencode}
       - OPENCODE_SERVER_PASSWORD=${ROBOI_OPENCODE_SERVER_PASSWORD:?ROBOI_OPENCODE_SERVER_PASSWORD is required}
       - POLL_INTERVAL_MS=${ROBOI_POLL_INTERVAL_MS:-2000}
       - WORKER_CONCURRENCY=${ROBOI_WORKER_CONCURRENCY:-3}
       - JOB_TIMEOUT_MS=${ROBOI_JOB_TIMEOUT_MS:-600000}
-      - ROBOI_DATALAKE_URL=${ROBOI_DATALAKE_URL:?ROBOI_DATALAKE_URL is required}
-      - ROBOI_DATALAKE_DEFAULT_LIMIT=${ROBOI_DATALAKE_DEFAULT_LIMIT:-200}
-      - ROBOI_DATALAKE_MAX_LIMIT=${ROBOI_DATALAKE_MAX_LIMIT:-1000}
-      - ROBOI_DATALAKE_STATEMENT_TIMEOUT_MS=${ROBOI_DATALAKE_STATEMENT_TIMEOUT_MS:-15000}
       - ROBOI_DEFAULT_CLIENT_CODE=${ROBOI_DEFAULT_CLIENT_CODE:?ROBOI_DEFAULT_CLIENT_CODE is required}
       - TZ=${TIMEZONE:-UTC}
     volumes:
       - ${ROBOI_INSTANCE_DIR:?ROBOI_INSTANCE_DIR is required}/data:/data/roboi
+    networks:
+      - web
     depends_on:
-      - opencode
+      - opencode-admin
+      - opencode-owner
+      - opencode-operator
       - api
 
   migrate:

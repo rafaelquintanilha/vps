@@ -118,7 +118,7 @@ services:
   canvascollab:
     build:
       context: ./apps/canvascollab
-      dockerfile: Dockerfile
+      dockerfile: ../../docker/canvascollab/Dockerfile
     restart: always
     ports:
       - "${CANVASCOLLAB_PORT:-3004}:3000"

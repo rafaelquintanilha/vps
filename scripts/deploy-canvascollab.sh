@@ -51,7 +51,7 @@ log "Rebuilding and restarting Canvascollab..."
 docker compose up -d --build canvascollab
 
 log "Reloading Caddy..."
-docker compose up -d caddy
+docker compose up -d --force-recreate caddy
 docker compose exec -T caddy caddy validate --config /etc/caddy/Caddyfile
 docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile
 

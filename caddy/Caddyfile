@@ -51,6 +51,10 @@ obs-chat.quantbrasil.com.br {
   reverse_proxy obs-chat-spotlight:3030
 }
 
+canvas.rafaelquintanilha.com {
+  reverse_proxy canvascollab:3000
+}
+
 import /etc/caddy/roboi-instances/*.caddy
 
 yt.rafaelquintanilha.com {

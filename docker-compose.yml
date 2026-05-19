@@ -115,6 +115,26 @@ services:
       retries: 3
       start_period: 15s
 
+  canvascollab:
+    build:
+      context: ./apps/canvascollab
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "${CANVASCOLLAB_PORT:-3004}:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - TZ=${TIMEZONE}
+    networks:
+      - web
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
   realstate-cron:
     build:
       context: ./apps/realstate-scraper

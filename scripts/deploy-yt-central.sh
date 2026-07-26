@@ -38,12 +38,12 @@ else
   log "Already up to date ($CURRENT_COMMIT)"
 fi
 
+cd "$COMPOSE_DIR"
+
 if [ "$RUN_DB_PUSH" = "true" ]; then
   log "Running database schema push..."
-  bun run db:push
+  docker compose run --rm --build --no-deps yt-central bun run db:push
 fi
-
-cd "$COMPOSE_DIR"
 
 log "Rebuilding and restarting services..."
 docker compose up -d --build yt-central yt-central-cron

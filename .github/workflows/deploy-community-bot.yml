@@ -1,0 +1,49 @@
+name: Deploy Community Bot
+
+on:
+  repository_dispatch:
+    types:
+      - community-bot-deploy
+  workflow_dispatch:
+    inputs:
+      run_db_push:
+        description: "Run bun run db:push before deploy"
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: community-bot-production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on:
+      - self-hosted
+      - Linux
+      - X64
+      - vps
+    timeout-minutes: 30
+    env:
+      RUN_DB_PUSH: ${{ github.event_name == 'workflow_dispatch' && inputs.run_db_push || github.event.client_payload.run_db_push || false }}
+
+    steps:
+      - name: Checkout vps repo
+        uses: actions/checkout@v4
+
+      - name: Sync live vps checkout
+        run: |
+          cd /opt/apps
+          git fetch origin master
+          git reset --hard origin/master
+
+      - name: Ensure deploy scripts are executable
+        run: |
+          chmod +x /opt/apps/scripts/deploy-community-bot.sh
+          chmod +x /opt/apps/scripts/provision-community-bot-db.sh
+
+      - name: Deploy community-bot
+        run: RUN_DB_PUSH="${RUN_DB_PUSH}" /opt/apps/scripts/deploy-community-bot.sh

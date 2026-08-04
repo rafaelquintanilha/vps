@@ -71,3 +71,8 @@ yt.rafaelquintanilha.com {
     reverse_proxy yt-central:3000
   }
 }
+
+community.rafaelquintanilha.com {
+  header X-Robots-Tag "noindex, nofollow"
+  reverse_proxy community-bot:3000
+}

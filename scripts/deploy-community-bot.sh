@@ -44,6 +44,9 @@ docker compose up -d --build community-bot
 log "Registering guild-scoped Discord commands..."
 docker compose run --rm community-bot bun run register-commands
 
+log "Syncing Caddyfile into the running container..."
+docker compose exec -T caddy sh -c 'cat > /etc/caddy/Caddyfile' < caddy/Caddyfile
+
 log "Validating and reloading Caddy..."
 docker compose exec -T caddy caddy validate --config /etc/caddy/Caddyfile
 docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile

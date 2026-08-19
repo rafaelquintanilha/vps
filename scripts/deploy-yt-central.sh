@@ -6,6 +6,8 @@ REPO_DIR="/opt/apps/apps/yt-central"
 COMPOSE_DIR="/opt/apps"
 LOG_FILE="/opt/apps/runtime/logs/yt-central-deploy.log"
 RUN_DB_PUSH="${RUN_DB_PUSH:-false}"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+SOURCE_COMPOSE="$(cd "$SCRIPT_DIR/.." && pwd)/docker-compose.yml"
 
 log() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
@@ -39,6 +41,11 @@ else
 fi
 
 cd "$COMPOSE_DIR"
+
+if [ "$SOURCE_COMPOSE" != "$COMPOSE_DIR/docker-compose.yml" ]; then
+  log "Syncing Docker Compose configuration..."
+  cp "$SOURCE_COMPOSE" "$COMPOSE_DIR/docker-compose.yml"
+fi
 
 if [ "$RUN_DB_PUSH" = "true" ]; then
   log "Running database schema push..."

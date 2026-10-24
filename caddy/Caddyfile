@@ -57,21 +57,6 @@ canvas.rafaelquintanilha.com {
 
 import /etc/caddy/roboi-instances/*.caddy
 
-yt.rafaelquintanilha.com {
-  @healthz path /healthz
-
-  handle @healthz {
-    reverse_proxy yt-central:3000
-  }
-
-  handle {
-    basic_auth {
-      {$YT_CENTRAL_BASIC_AUTH_USER} {$YT_CENTRAL_BASIC_AUTH_HASH}
-    }
-    reverse_proxy yt-central:3000
-  }
-}
-
 community.rafaelquintanilha.com {
   header X-Robots-Tag "noindex, nofollow"
   reverse_proxy community-bot:3000

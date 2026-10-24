@@ -27,7 +27,7 @@ if [ -f /opt/apps/.env ]; then
 fi
 
 # Databases to backup
-DATABASES="postgres metabaseappdb pronto devqb_mc8b yt_central ${COMMUNITY_BOT_DB_NAME:-community_bot}"
+DATABASES="postgres metabaseappdb pronto devqb_mc8b ${COMMUNITY_BOT_DB_NAME:-community_bot}"
 
 # Export AWS CLI environment variables
 export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY}"
